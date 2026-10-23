@@ -1,0 +1,123 @@
+' ===== VISTA 1: CASOS DE USO (ESCENARIOS) =====
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+actor Cliente
+actor "Vendedor / Caja" as Vendedor
+actor Administrador
+rectangle "PixelVault System" {
+  usecase "RF1: Consultar Catálogo" as UC1
+  usecase "RF2: Procesar Venta" as UC2
+  usecase "Aplicar Crédito Trade-In" as UC2_1
+  usecase "RF3: Registrar Arriendo" as UC3
+  usecase "Calcular Multa por Mora" as UC3_1
+  usecase "RF4: Gestionar VIP" as UC4
+}
+Cliente --> UC1
+Cliente --> UC2
+Vendedor --> UC2
+UC2 <.. UC2_1 : <<extend>>
+Vendedor --> UC3
+UC3 <.. UC3_1 : <<extend>>
+Administrador --> UC4
+@enduml
+
+' ===== VISTA 2: LÓGICA (CLASES) - COMPLETADA =====
+@startuml
+class Producto {
+  +String id
+  +String nombre
+  +String plataforma
+  +String formato
+  +double precio
+  +int stock
+  +boolean verificarStock()
+}
+class Cliente {
+  +String rut
+  +String nombre
+  +boolean esVIP
+  +int puntos
+}
+class Arriendo {
+  +String idArriendo
+  +Date fechaInicio
+  +Date fechaLimite
+  +double calcularMulta(int diasAtraso)
+}
+class Venta {
+  +String idVenta
+  +double total
+  +void calcularImpuestos()
+}
+Cliente "1" -- "0..*" Arriendo : realiza
+Cliente "1" -- "0..*" Venta : efectúa
+Venta "0..*" -- "1..*" Producto : incluye
+Arriendo "0..*" -- "1" Producto : sobre (formato físico)
+@enduml
+
+' ===== VISTA 3: PROCESOS (SECUENCIA) - FALTABA EN LA GUÍA =====
+@startuml
+actor Cliente
+participant "Web UI (SPA)" as UI
+participant "API Gateway" as GW
+participant "Servicio Catálogo" as Cat
+participant "Servicio Arriendos" as Arr
+database "PostgreSQL" as DB
+
+== Compra: agregar al carrito ==
+Cliente -> UI : Agregar producto
+UI -> GW : POST /carrito
+GW -> Cat : verificarStock()
+Cat -> DB : SELECT stock
+DB --> Cat : stock
+alt stock disponible
+  Cat --> UI : OK (stock - 1)
+else sin stock
+  Cat --> UI : Error: sin stock
+end
+
+== Arriendo con multa ==
+Cliente -> UI : Devolver videojuego
+UI -> GW : PUT /arriendos/{id}/devolucion
+GW -> Arr : calcularMulta(diasAtraso)
+Arr -> DB : UPDATE arriendo y stock
+Arr --> UI : Multa = diasAtraso x $1.500
+@enduml
+
+' ===== VISTA 4: DESARROLLO (COMPONENTES) =====
+@startuml
+package "Capa Presentación (Frontend)" {
+  [Componente Web UI] as UI
+  [Módulo Arriendos] as ModArriendo
+}
+package "Capa de Negocio (Backend API)" {
+  [API Gateway] as Gateway
+  [Servicio Catálogo] as ServCat
+  [Servicio Arriendos] as ServArr
+}
+database "Capa de Datos" {
+  [DB Relacional SQL] as DB
+}
+UI --> Gateway
+ModArriendo --> Gateway
+Gateway --> ServCat
+Gateway --> ServArr
+ServCat --> DB
+ServArr --> DB
+@enduml
+
+' ===== VISTA 5: DESPLIEGUE (FÍSICA) =====
+@startuml
+node "Cliente Web Browser" {
+  artifact "Single Page App (HTML5/JS)" as SPA
+}
+node "Servidor de Aplicaciones (Cloud)" {
+  component "Node.js / Express Server" as AppServer
+}
+node "Servidor de Base de Datos" {
+  database "PostgreSQL Database" as Database
+}
+SPA --> AppServer : HTTPS / API REST
+AppServer --> Database : TCP/IP (Puerto 5432)
+@enduml
